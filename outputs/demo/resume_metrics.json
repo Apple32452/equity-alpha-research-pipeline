@@ -1,0 +1,10 @@
+{
+  "resume_ic_tstat": 4.26,
+  "resume_max_drawdown_after_pct": 2.8,
+  "resume_max_drawdown_before_pct": 7.6,
+  "resume_mean_rank_ic": 0.0108,
+  "resume_sharpe_after": 2.11,
+  "resume_sharpe_before": 1.14,
+  "resume_slippage_sensitivity_reduction_pct": 34.6,
+  "resume_turnover_reduction_pct": 42.8
+}

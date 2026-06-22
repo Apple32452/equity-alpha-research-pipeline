@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "equity-alpha-research-pipeline"
+version = "0.1.0"
+description = "Cross-sectional equity alpha research pipeline with OOS, regime, turnover, and transaction-cost-aware evaluation."
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]

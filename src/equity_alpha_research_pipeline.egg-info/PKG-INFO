@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: equity-alpha-research-pipeline
+Version: 0.1.0
+Summary: Cross-sectional equity alpha research pipeline with OOS, regime, turnover, and transaction-cost-aware evaluation.
+Requires-Python: >=3.10
