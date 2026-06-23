@@ -1,114 +1,173 @@
 # Cross-Sectional Equity Alpha Research Pipeline
 
-This project is the real, defensible version of the resume bullets below:
+A reproducible daily equity-research backtest for evaluating simple cross-sectional signals under next-day-return, transaction-cost-aware, liquidity-aware, and regime-diagnostic settings.
 
-> Built a cross-sectional equity research pipeline across 300+ U.S. equities over 3 years of historical data, testing statistical signals under out-of-sample, regime-split, and transaction-cost-aware evaluation.
->
-> Designed alpha-evaluation logic using rank correlation, volatility normalization, turnover controls, drawdown diagnostics, and liquidity-aware filters; improved simulated transaction-cost-adjusted Sharpe from X.XX to Y.YY.
->
-> Reduced simulated turnover by X% and slippage sensitivity by Y% by adding volatility-scaled sizing, liquidity screens, and trade/no-trade thresholds.
->
-> Cut maximum drawdown from X% to Y% in regime-stress tests by applying downside-risk filters and execution-aware position sizing.
-
-The project intentionally separates **real research outputs** from **resume wording**. Run it on real historical data first, then copy the values from `outputs/real_run/resume_metrics.json` into the resume. Do not use the synthetic demo results as resume claims.
+> **Research prototype, not a live trading system.**
+> This repository is designed for transparent historical simulation and portfolio-research workflows. It does not represent live PnL, production execution, or institutional-grade market-impact modeling.
 
 ---
 
-## What this project does
+## Overview
 
-### 1. Data pipeline
+The pipeline downloads or generates daily OHLCV panels, constructs cross-sectional alpha features, forms long/short portfolios, applies transaction-cost assumptions, and exports performance, turnover, drawdown, rank-IC, slippage-sensitivity, and regime-diagnostic outputs.
 
-The pipeline can run in two modes:
+The project supports two data modes:
 
-- `synthetic`: creates a realistic test panel so you can verify the code without internet access.
-- `yfinance`: downloads daily OHLCV data for a user-provided U.S. equity universe.
+* `synthetic`: deterministic simulated data for validating the code path.
+* `yfinance`: daily historical OHLCV data for a supplied U.S. equity universe.
 
-Input panel format:
+Synthetic results are **only** for testing the pipeline. Do not use synthetic results in a resume, portfolio, or professional discussion of strategy performance.
+
+---
+
+## Research question
+
+The project compares:
+
+1. A simple cross-sectional momentum baseline.
+2. A composite signal and portfolio-construction workflow with liquidity filtering, inverse-volatility sizing, turnover controls, and drawdown-triggered risk reduction.
+
+The comparison is intentionally a **combined signal-and-portfolio-construction experiment**. A performance difference should not be interpreted as evidence that one individual alpha feature alone caused the improvement.
+
+---
+
+## Pipeline design
+
+### 1. Data
+
+The expected long-panel format is:
 
 ```text
 date, ticker, open, high, low, close, adj_close, volume
 ```
 
-### 2. Feature generation
+For `yfinance` runs, the pipeline downloads daily OHLCV data and retains tickers meeting the requested history requirement.
 
-Features are computed at close `t` and evaluated against close-to-close return `t+1` to avoid look-ahead bias.
+The project uses:
+
+* adjusted-close returns for feature and return calculations;
+* close price times volume for average dollar-volume estimates;
+* a user-supplied ticker universe.
+
+### 2. Features
+
+All signal features are computed from information available at close (t). Portfolio weights formed at close (t) are evaluated using the return from close (t) to close (t+1).
 
 Implemented features:
 
-- 21-day momentum
-- 63-day momentum
-- 5-day short-term reversal
-- 21-day and 63-day realized volatility
-- 20-day average dollar volume
-- cross-sectional liquidity rank
-- cross-sectional rank-normalized alpha inputs
+* 21-day momentum;
+* 63-day momentum;
+* 5-day short-term reversal;
+* 21-day realized volatility;
+* 63-day realized volatility;
+* 20-day average dollar volume;
+* cross-sectional liquidity rank;
+* cross-sectional rank-normalized feature inputs.
 
-### 3. Signal generation
+### 3. Signals
 
-The project compares two strategy versions:
-
-#### Baseline strategy
-
-Simple medium-term cross-sectional momentum:
+#### Baseline signal
 
 ```text
-signal = 0.70 * rank(momentum_63) + 0.30 * rank(momentum_21)
+signal = 0.70 * rank(momentum_63)
+       + 0.30 * rank(momentum_21)
 ```
 
-#### Improved strategy
-
-Composite alpha signal:
+#### Composite signal
 
 ```text
-signal = 0.42 * rank(momentum_63)
-       + 0.23 * rank(momentum_21)
-       + 0.20 * rank(reversal_5)
-       + 0.15 * rank(low_volatility_21)
+signal = 0.66 * rank(momentum_63)
+       + 0.27 * rank(momentum_21)
+       + 0.05 * rank(reversal_5)
+       + 0.02 * rank(low_volatility_21)
 ```
 
-The improved portfolio then adds:
+The composite signal emphasizes medium-term momentum while adding a modest short-term reversal and low-volatility adjustment.
 
-- liquidity-aware stock filtering
-- volatility-scaled sizing
-- trade/no-trade threshold to reduce small rebalances
-- turnover cap
-- downside-risk filter during stress regimes
-- transaction-cost and liquidity-sensitive slippage model
+### 4. Portfolio construction
 
-### 4. Backtest design
+The baseline portfolio:
 
-For each date:
+* forms an equal-gross long/short portfolio;
+* buys the top decile and shorts the bottom decile of the baseline signal;
+* uses no explicit liquidity filter, volatility scaling, or turnover controls.
 
-1. Compute features using data available at close `t`.
-2. Build signal at close `t`.
-3. Form long/short portfolio weights at close `t`.
-4. Apply weights to next-day returns from close `t` to close `t+1`.
-5. Subtract transaction costs and slippage.
+The improved workflow:
 
-This is a simple daily research backtest, not an intraday execution simulator.
+* removes stocks below the 30th percentile of cross-sectional liquidity;
+* forms long/short positions from the top and bottom approximately 18% of the remaining universe;
+* applies inverse-volatility scaling;
+* suppresses small position changes with a trade threshold;
+* limits daily turnover;
+* reduces gross exposure after sufficiently large trailing-market drawdowns.
 
-### 5. Evaluation metrics
+The strategy is a research portfolio with long/short targets. Before interpreting results as market-neutral, inspect realized net exposure after volatility scaling and trade-control transformations.
 
-The output includes:
+### 5. Backtest timing
 
-- transaction-cost-adjusted Sharpe
-- gross Sharpe before costs
-- annualized return and volatility
-- maximum drawdown
-- daily turnover
-- average daily transaction cost in basis points
-- rank information coefficient (Spearman rank correlation)
-- calm / volatile / stress regime summaries
-- equity curve plot
-- drawdown plot
-- turnover plot
+For each trading date (t):
+
+1. Compute features from data available at close (t).
+2. Construct the cross-sectional signal at close (t).
+3. Form target portfolio weights at close (t).
+4. Apply target weights to close-to-close returns from (t) to (t+1).
+5. Deduct estimated transaction costs based on daily changes in portfolio weights.
+
+This setup avoids same-day signal-return look-ahead. It is a forward-return historical backtest, not a rolling train/validation/test or walk-forward model-selection framework.
 
 ---
 
-## Folder structure
+## Transaction-cost model
+
+Daily costs include:
+
+* commission in basis points;
+* half-spread in basis points;
+* slippage in basis points;
+* a relative liquidity multiplier based on 20-day average dollar volume.
+
+The model is intended for sensitivity analysis. It does **not** include:
+
+* portfolio-NAV-based participation rates;
+* calibrated square-root market impact;
+* intraday order-book depth;
+* borrow costs;
+* exchange fees or rebates;
+* production execution logic.
+
+Therefore, all results should be described as **simulated historical, transaction-cost-aware research results**.
+
+---
+
+## Metrics and diagnostics
+
+The pipeline exports:
+
+* annualized return;
+* annualized volatility;
+* a risk-adjusted return statistic currently reported in code as `sharpe`;
+* gross risk-adjusted return before estimated costs;
+* maximum drawdown;
+* daily turnover;
+* average daily transaction cost;
+* rank information coefficient;
+* rank-IC t-statistic;
+* calm, volatile, and stress regime summaries;
+* slippage-sensitivity results;
+* equity-curve, drawdown, and turnover figures.
+
+### Important metric conventions
+
+* The current `sharpe` field is calculated as annualized geometric return divided by annualized volatility. It is best interpreted as an internal risk-adjusted return statistic, not a conventional excess-return Sharpe ratio.
+* The rank-IC t-statistic assumes independent daily IC observations and is not HAC or Newey--West adjusted.
+* Regime labels are retrospective diagnostics based on full-sample volatility quantiles and drawdown conditions. They are not a real-time regime-forecasting model.
+
+---
+
+## Repository structure
 
 ```text
-equity_alpha_research_pipeline/
+equity-alpha-research-pipeline/
 ├── data/
 │   └── universe/
 │       ├── example_universe_50.csv
@@ -136,8 +195,6 @@ equity_alpha_research_pipeline/
 
 ## Setup
 
-From the project root:
-
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -145,7 +202,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-Run tests:
+Run the unit tests:
 
 ```bash
 pytest -q
@@ -153,9 +210,9 @@ pytest -q
 
 ---
 
-## Run the synthetic demo
+## Run the synthetic validation demo
 
-Use this first to check that everything works:
+Use the synthetic mode first to confirm that the code, dependencies, figures, and output files work correctly.
 
 ```bash
 python -m equity_alpha.run_pipeline \
@@ -166,7 +223,7 @@ python -m equity_alpha.run_pipeline \
   --output-dir outputs/demo
 ```
 
-Expected files:
+Expected outputs include:
 
 ```text
 outputs/demo/baseline_daily_backtest.csv
@@ -184,15 +241,13 @@ outputs/demo/drawdown.png
 outputs/demo/turnover.png
 ```
 
-Again: synthetic results are only for verifying the code.
+Do not use synthetic performance outputs as resume or portfolio claims.
 
 ---
 
-## Run on real U.S. equities
+## Run on historical U.S. equities
 
-The included `example_universe_300.csv` is only a starter universe. Before using results professionally, verify that the universe matches what you want: S&P 500 names, Russell 1000 names, NASDAQ liquid universe, or your own liquidity-screened list.
-
-Example command:
+The included universe files are examples only. For professional analysis, use a documented and liquidity-screened universe whose composition you understand.
 
 ```bash
 python -m equity_alpha.run_pipeline \
@@ -208,86 +263,75 @@ python -m equity_alpha.run_pipeline \
   --output-dir outputs/real_run
 ```
 
-After the run, open:
+After the run, inspect:
 
 ```text
-outputs/real_run/resume_metrics.json
 outputs/real_run/strategy_comparison.csv
+outputs/real_run/rank_ic_summary.csv
 outputs/real_run/improved_regime_summary.csv
 outputs/real_run/slippage_sensitivity.csv
+outputs/real_run/resume_metrics.json
 ```
+
+Always verify every number in `resume_metrics.json` against the corresponding CSV outputs before using it externally.
 
 ---
 
-## How to make the resume numbers honest
+## Reproducibility checklist
 
-After running on real data, replace the resume numbers using the JSON file.
+For every run that may support a resume bullet, interview discussion, or project result, save:
 
-Example format:
+* exact universe CSV used;
+* requested and retained ticker counts;
+* data-download timestamp;
+* start and end dates;
+* commission, spread, and slippage assumptions;
+* repository commit hash;
+* Python and package versions;
+* all exported CSV files and figures.
 
-```json
-{
-  "resume_sharpe_before": 0.84,
-  "resume_sharpe_after": 1.07,
-  "resume_turnover_reduction_pct": 12.0,
-  "resume_max_drawdown_before_pct": 18.6,
-  "resume_max_drawdown_after_pct": 14.9,
-  "resume_slippage_sensitivity_reduction_pct": 9.0,
-  "resume_mean_rank_ic": 0.0184,
-  "resume_ic_tstat": 2.11
-}
-```
-
-Then your resume bullet should become:
-
-```text
-Designed alpha-evaluation logic using rank correlation, volatility normalization,
-turnover controls, drawdown diagnostics, and liquidity-aware filters; improved
-simulated transaction-cost-adjusted Sharpe from 0.84 to 1.07.
-```
-
-Only use the numbers if they come from your real run.
+Because yfinance data can change through corrections, delistings, ticker changes, or vendor adjustments, preserve the downloaded raw panel or a versioned processed panel for any reported result.
 
 ---
 
-## Defensible interview explanation
+## Appropriate resume language
 
-A concise explanation:
+Use wording such as:
 
-> I built a daily cross-sectional equity alpha research pipeline. It downloads OHLCV data, creates momentum, reversal, volatility, and liquidity features, ranks stocks cross-sectionally each day, and tests a long/short portfolio using next-day returns. I compared a baseline momentum signal against an improved version with liquidity filters, volatility-scaled sizing, trade thresholds, turnover caps, and a downside-risk filter. I evaluated the strategy using transaction-cost-adjusted Sharpe, rank IC, max drawdown, turnover, and regime-split performance.
+> Built a cross-sectional equity research pipeline across a documented U.S. equity universe, evaluating momentum, reversal, volatility, and liquidity features with forward next-day returns, transaction-cost assumptions, and regime diagnostics.
 
-If asked why this is not overclaiming:
+> Compared a baseline momentum portfolio with a composite signal-and-portfolio-construction workflow incorporating liquidity filters, volatility scaling, turnover controls, and drawdown-triggered risk reduction.
 
-> It is a research backtest, not a live production trading system. The transaction-cost and slippage model is simulated, so I report the results as simulated and transaction-cost-adjusted, not live PnL.
+> Reported simulated historical performance using transaction-cost-aware returns, turnover, drawdown, rank IC, and slippage-sensitivity diagnostics.
 
----
+Avoid describing this project as:
 
-## Important limitations
-
-This project is intentionally realistic but still simple. It does not include:
-
-- survivorship-bias-free universe construction
-- point-in-time fundamentals
-- corporate-action validation beyond adjusted close
-- intraday order book simulation
-- borrow costs for shorting
-- market impact model calibrated to proprietary execution data
-- production execution stack
-
-That is why the resume should say **simulated**, **historical**, and **research pipeline** rather than live trading or production execution.
+* live trading;
+* production execution;
+* institutional-grade backtesting;
+* intraday market making;
+* a survivorship-bias-free performance study;
+* validated live PnL.
 
 ---
 
-## Suggested final resume version after real run
+## Limitations
 
-Replace all `X` values after running the real data pipeline:
+This project intentionally does not include:
 
-```text
-Quantitative Researcher | Remote / Part-Time
-• Built a cross-sectional equity research pipeline across 300+ U.S. equities over 3 years of historical data, testing statistical signals under out-of-sample, regime-split, and transaction-cost-aware evaluation.
-• Designed alpha-evaluation logic using rank correlation, volatility normalization, turnover controls, drawdown diagnostics, and liquidity-aware filters; improved simulated transaction-cost-adjusted Sharpe from X.XX to Y.YY.
-• Reduced simulated turnover by X% and slippage sensitivity by Y% by adding volatility-scaled sizing, liquidity screens, and trade/no-trade thresholds.
-• Cut maximum drawdown from X.X% to Y.Y% in regime-stress tests by applying downside-risk filters and execution-aware position sizing.
-```
+* survivorship-bias-free point-in-time universe construction;
+* delisting-return treatment;
+* point-in-time fundamentals;
+* institutional corporate-action validation;
+* borrow availability or borrow fees;
+* short-sale constraints;
+* tax effects;
+* calibrated market impact;
+* portfolio-NAV-based participation rates;
+* intraday execution simulation;
+* order-book data;
+* production trading infrastructure;
+* walk-forward hyperparameter tuning;
+* statistical multiple-testing corrections.
 
-The slippage sensitivity number comes from `slippage_sensitivity.csv`, where both strategies are re-run across several slippage assumptions and compared by the slope of Sharpe versus slippage bps.
+It is therefore best used as a transparent, reproducible equity-alpha research project and a foundation for further model-validation work.
