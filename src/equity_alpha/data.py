@@ -90,7 +90,7 @@ def download_yfinance_panel(
         if field in raw.columns.get_level_values(0):
             part = raw[field].copy()
             part.columns.name = "ticker"
-            frames.append(part.stack(dropna=False).rename(out_name))
+            frames.append(part.stack(future_stack=True).rename(out_name))
     panel = pd.concat(frames, axis=1)
     panel.index.names = ["date", "ticker"]
     panel = panel.sort_index()
